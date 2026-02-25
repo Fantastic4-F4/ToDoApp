@@ -1,9 +1,11 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { Todo } from '../../types/todo';
+import { Todo, TodoPriority } from '../../types/todo';
 
 type AddTodoPayload = {
   title: string;
   description: string;
+  dueDate: string;
+  priority: TodoPriority;
 };
 
 type UpdateTodoPayload = {
@@ -20,12 +22,36 @@ const initialState: TodosState = {
   items: [],
 };
 
+const priorityValues: TodoPriority[] = ['Low', 'Medium', 'High'];
+
+function normalizeDueDate(value: string | undefined, fallbackDate: string): string {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return fallbackDate;
+  }
+  const parsed = new Date(`${value}T00:00:00`);
+  return Number.isNaN(parsed.getTime()) ? fallbackDate : value;
+}
+
+function normalizePriority(value: string | undefined): TodoPriority {
+  if (value && priorityValues.includes(value as TodoPriority)) {
+    return value as TodoPriority;
+  }
+  return 'Medium';
+}
+
 const todosSlice = createSlice({
   name: 'todos',
   initialState,
   reducers: {
     loadTodos(state, action: PayloadAction<Todo[]>) {
-      state.items = action.payload;
+      state.items = action.payload.map((todo) => {
+        const fallbackDate = todo.createdAt.slice(0, 10);
+        return {
+          ...todo,
+          dueDate: normalizeDueDate(todo.dueDate, fallbackDate),
+          priority: normalizePriority(todo.priority),
+        };
+      });
     },
     addTodo(state, action: PayloadAction<AddTodoPayload>) {
       const now = new Date().toISOString();
@@ -33,6 +59,8 @@ const todosSlice = createSlice({
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
         title: action.payload.title.trim(),
         description: action.payload.description.trim(),
+        dueDate: normalizeDueDate(action.payload.dueDate, now.slice(0, 10)),
+        priority: normalizePriority(action.payload.priority),
         createdAt: now,
         updatedAt: now,
       };
