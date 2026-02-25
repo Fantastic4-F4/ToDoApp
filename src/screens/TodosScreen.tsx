@@ -1,28 +1,52 @@
 import { useMemo, useState } from 'react';
-import { Alert, SectionList, View } from 'react-native';
-import { Button, Card, Dialog, IconButton, Portal, Text, TextInput } from 'react-native-paper';
+import { Alert, FlatList, View } from 'react-native';
+import {
+  Button,
+  Card,
+  Chip,
+  Dialog,
+  HelperText,
+  IconButton,
+  Portal,
+  SegmentedButtons,
+  Text,
+  TextInput,
+} from 'react-native-paper';
 import { deleteTodo, updateTodo } from '../features/todos/todosSlice';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { Todo } from '../types/todo';
+import { Todo, TodoPriority } from '../types/todo';
 
-type TodoSection = {
-  title: string;
-  data: Todo[];
-};
+type SortBy = 'date' | 'priority';
+type PriorityFilter = 'All' | TodoPriority;
+const priorityRank: Record<TodoPriority, number> = { High: 0, Medium: 1, Low: 2 };
 
-function getDateLabel(isoDate: string): string {
-  return new Date(isoDate).toLocaleDateString(undefined, {
-    weekday: 'long',
+function getTodoDate(todo: Todo): string {
+  return todo.dueDate && /^\d{4}-\d{2}-\d{2}$/.test(todo.dueDate)
+    ? todo.dueDate
+    : todo.createdAt.slice(0, 10);
+}
+
+function getTodoPriority(todo: Todo): TodoPriority {
+  return todo.priority ?? 'Medium';
+}
+
+function isValidDateFilter(value: string): boolean {
+  if (!value) {
+    return true;
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+  const parsed = new Date(`${value}T00:00:00`);
+  return !Number.isNaN(parsed.getTime());
+}
+
+function formatDateOnly(dateValue: string): string {
+  return new Date(`${dateValue}T00:00:00`).toLocaleDateString(undefined, {
+    weekday: 'short',
     month: 'short',
     day: 'numeric',
     year: 'numeric',
-  });
-}
-
-function formatTime(isoDate: string): string {
-  return new Date(isoDate).toLocaleTimeString(undefined, {
-    hour: 'numeric',
-    minute: '2-digit',
   });
 }
 
@@ -33,23 +57,34 @@ export function TodosScreen() {
   const [editTodo, setEditTodo] = useState<Todo | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
+  const [sortBy, setSortBy] = useState<SortBy>('date');
+  const [dateFilter, setDateFilter] = useState('');
+  const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('All');
 
-  const sections = useMemo<TodoSection[]>(() => {
-    const sorted = [...todos].sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    );
+  const isDateFilterValid = isValidDateFilter(dateFilter);
 
-    const grouped = sorted.reduce<Record<string, Todo[]>>((acc, todo) => {
-      const dateLabel = getDateLabel(todo.createdAt);
-      if (!acc[dateLabel]) {
-        acc[dateLabel] = [];
+  const visibleTodos = useMemo(() => {
+    const filtered = todos.filter((todo) => {
+      const todoDate = getTodoDate(todo);
+      const todoPriority = getTodoPriority(todo);
+      const byDate = !dateFilter || (isDateFilterValid && todoDate === dateFilter);
+      const byPriority = priorityFilter === 'All' || todoPriority === priorityFilter;
+      return byDate && byPriority;
+    });
+
+    return filtered.sort((a, b) => {
+      const dateCompare =
+        new Date(`${getTodoDate(a)}T00:00:00`).getTime() -
+        new Date(`${getTodoDate(b)}T00:00:00`).getTime();
+
+      if (sortBy === 'date') {
+        return dateCompare;
       }
-      acc[dateLabel].push(todo);
-      return acc;
-    }, {});
 
-    return Object.entries(grouped).map(([title, data]) => ({ title, data }));
-  }, [todos]);
+      const priorityCompare = priorityRank[getTodoPriority(a)] - priorityRank[getTodoPriority(b)];
+      return priorityCompare !== 0 ? priorityCompare : dateCompare;
+    });
+  }, [dateFilter, isDateFilterValid, priorityFilter, sortBy, todos]);
 
   const openEditDialog = (todo: Todo) => {
     setEditTodo(todo);
@@ -92,10 +127,58 @@ export function TodosScreen() {
 
   return (
     <View className="flex-1 bg-aqua/10">
-      <SectionList
-        sections={sections}
+      <FlatList
+        data={visibleTodos}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
+        ListHeaderComponent={
+          <Card mode="contained" style={{ marginBottom: 12, backgroundColor: '#ffffff' }}>
+            <Card.Content>
+              <Text variant="titleMedium" style={{ color: '#1f2937', fontWeight: '700', marginBottom: 10 }}>
+                Sort and Filter
+              </Text>
+
+              <Text variant="labelLarge" style={{ color: '#374151', marginBottom: 8 }}>
+                Sort by
+              </Text>
+              <SegmentedButtons
+                value={sortBy}
+                onValueChange={(value) => setSortBy(value as SortBy)}
+                style={{ marginBottom: 12 }}
+                buttons={[
+                  { value: 'date', label: 'Date' },
+                  { value: 'priority', label: 'Priority' },
+                ]}
+              />
+
+              <TextInput
+                label="Filter date (YYYY-MM-DD)"
+                mode="outlined"
+                value={dateFilter}
+                onChangeText={setDateFilter}
+                style={{ marginBottom: 4, backgroundColor: '#f8fbff' }}
+              />
+              <HelperText type="error" visible={!isDateFilterValid}>
+                Enter date in YYYY-MM-DD format
+              </HelperText>
+
+              <Text variant="labelLarge" style={{ color: '#374151', marginBottom: 8 }}>
+                Filter by priority
+              </Text>
+              <SegmentedButtons
+                value={priorityFilter}
+                onValueChange={(value) => setPriorityFilter(value as PriorityFilter)}
+                style={{ marginBottom: 4 }}
+                buttons={[
+                  { value: 'All', label: 'All' },
+                  { value: 'Low', label: 'Low' },
+                  { value: 'Medium', label: 'Medium' },
+                  { value: 'High', label: 'High' },
+                ]}
+              />
+            </Card.Content>
+          </Card>
+        }
         ListEmptyComponent={
           <Card mode="contained" style={{ backgroundColor: '#ffffff' }}>
             <Card.Content>
@@ -108,14 +191,6 @@ export function TodosScreen() {
             </Card.Content>
           </Card>
         }
-        renderSectionHeader={({ section }) => (
-          <Text
-            variant="titleSmall"
-            style={{ marginTop: 8, marginBottom: 8, color: '#1f3c88', fontWeight: '700' }}
-          >
-            {section.title}
-          </Text>
-        )}
         renderItem={({ item }) => (
           <Card mode="contained" style={{ marginBottom: 12, backgroundColor: '#ffffff' }}>
             <Card.Content>
@@ -128,8 +203,15 @@ export function TodosScreen() {
                     {item.description || 'No description'}
                   </Text>
                   <Text variant="bodySmall" style={{ color: '#6b7280', marginTop: 8 }}>
-                    Created at {formatTime(item.createdAt)}
+                    Date: {formatDateOnly(getTodoDate(item))}
                   </Text>
+                  <Chip
+                    compact
+                    style={{ alignSelf: 'flex-start', marginTop: 8 }}
+                    textStyle={{ fontWeight: '700' }}
+                  >
+                    Priority: {getTodoPriority(item)}
+                  </Chip>
                 </View>
 
                 <View className="flex-row">
