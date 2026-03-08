@@ -16,11 +16,27 @@ export function TopTabsNavigator() {
       <Tab.Navigator
         initialRouteName="AllTodos"
         screenOptions={{
-          tabBarStyle: { backgroundColor: '#b58cff' },
-          tabBarLabelStyle: { fontWeight: '700', textTransform: 'none' },
+          tabBarStyle: {
+            backgroundColor: '#8b5cf6',
+            elevation: 10,
+            shadowColor: '#4c1d95',
+            shadowOffset: { width: 0, height: 10 },
+            shadowOpacity: 0.3,
+            shadowRadius: 20,
+          },
+          tabBarIndicatorStyle: {
+            backgroundColor: '#ffffff',
+            height: 3,
+            borderRadius: 3,
+          },
           tabBarActiveTintColor: '#ffffff',
-          tabBarInactiveTintColor: '#d5b8f5',
-          tabBarIndicatorStyle: { backgroundColor: '#ffd166', height: 4, borderRadius: 2 },
+          tabBarInactiveTintColor: 'rgba(255, 255, 255, 0.6)',
+          tabBarLabelStyle: {
+            fontWeight: '700',
+            textTransform: 'uppercase',
+            fontSize: 13,
+            letterSpacing: 0.5,
+          },
         }}
       >
         <Tab.Screen name="AddTodo" component={AddTodoScreen} options={{ title: 'Add Todo' }} />

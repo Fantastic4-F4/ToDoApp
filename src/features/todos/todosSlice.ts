@@ -5,13 +5,18 @@ type AddTodoPayload = {
   title: string;
   description: string;
   dueDate: string;
+  dueTime?: string;
   priority: TodoPriority;
+  notificationId?: string;
 };
 
-type UpdateTodoPayload = {
+export interface UpdateTodoPayload {
   id: string;
-  title: string;
-  description: string;
+  title?: string;
+  description?: string;
+  dueDate?: string;
+  dueTime?: string;
+  priority?: TodoPriority;
 };
 
 type TodosState = {
@@ -56,24 +61,27 @@ const todosSlice = createSlice({
     addTodo(state, action: PayloadAction<AddTodoPayload>) {
       const now = new Date().toISOString();
       const todo: Todo = {
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+        id: Date.now().toString(),
         title: action.payload.title.trim(),
         description: action.payload.description.trim(),
-        dueDate: normalizeDueDate(action.payload.dueDate, now.slice(0, 10)),
-        priority: normalizePriority(action.payload.priority),
-        createdAt: now,
-        updatedAt: now,
+        dueDate: action.payload.dueDate,
+        dueTime: action.payload.dueTime,
+        priority: action.payload.priority,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       };
       state.items.push(todo);
     },
-    updateTodo(state, action: PayloadAction<UpdateTodoPayload>) {
-      const item = state.items.find((todo) => todo.id === action.payload.id);
-      if (!item) {
-        return;
+    updateTodo: (state, action: PayloadAction<UpdateTodoPayload>) => {
+      const todo = state.items.find((item) => item.id === action.payload.id);
+      if (todo) {
+        if (action.payload.title !== undefined) todo.title = action.payload.title.trim();
+        if (action.payload.description !== undefined) todo.description = action.payload.description.trim();
+        if (action.payload.dueDate !== undefined) todo.dueDate = normalizeDueDate(action.payload.dueDate, todo.dueDate);
+        if (action.payload.dueTime !== undefined) todo.dueTime = action.payload.dueTime;
+        if (action.payload.priority !== undefined) todo.priority = normalizePriority(action.payload.priority);
+        todo.updatedAt = new Date().toISOString();
       }
-      item.title = action.payload.title.trim();
-      item.description = action.payload.description.trim();
-      item.updatedAt = new Date().toISOString();
     },
     deleteTodo(state, action: PayloadAction<string>) {
       state.items = state.items.filter((todo) => todo.id !== action.payload);

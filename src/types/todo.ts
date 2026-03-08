@@ -5,6 +5,7 @@ export type Todo = {
   title: string;
   description: string;
   dueDate: string;
+  dueTime?: string;
   priority: TodoPriority;
   createdAt: string;
   updatedAt: string;
